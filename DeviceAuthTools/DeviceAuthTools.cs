@@ -142,6 +142,14 @@ namespace DeviceAuthGenerator
             this.ButtonDelete.Enabled = false;
 
             string deviceAuthId = Prompt.ShowDialog("Enter the Device Id");
+            if(string.IsNullOrEmpty(deviceAuthId)) {
+                MessageBox.Show("The device id cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                this.ButtonCreate.Enabled = true;
+                this.ButtonShow.Enabled = true;
+                this.ButtonDelete.Enabled = true;
+                return;
+            }
 
             this.RichTextBoxLogger.Clear();
             this.RichTextBoxLogger.AppendText("Please wait...");
@@ -212,6 +220,11 @@ namespace DeviceAuthGenerator
         private void LabelSetUserAgent_Click(object sender, EventArgs e)
         {
             string userAgent = Prompt.ShowDialog("Enter the User Agent");
+            if (string.IsNullOrEmpty(userAgent))
+            {
+                MessageBox.Show("The User-Agent cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             client.DefaultRequestHeaders.Remove("User-Agent");
             client.DefaultRequestHeaders.Add("User-Agent", "" + userAgent);
