@@ -15,7 +15,7 @@ namespace DeviceAuthGenerator
     public partial class DeviceAuthTools : Form
     {
         private static readonly HttpClient client = new HttpClient();
-        private static readonly string basicToken = "basic MzQ0NmNkNzI2OTRjNGE0NDg1ZDgxYjc3YWRiYjIxNDE6OTIwOWQ0YTVlMjVhNDU3ZmI5YjA3NDg5ZDMxM2I0MWE=";
+        private static readonly string basicToken = "basic NTIyOWRjZDNhYzM4NDUyMDhiNDk2NjQ5MDkyZjI1MWI6ZTNiZDJkM2UtYmY4Yy00ODU3LTllN2QtZjNkOTQ3ZDIyMGM3=";
         private Timer checkDeviceCodeTimer;
         private string deviceCode;
         private string accountId;
