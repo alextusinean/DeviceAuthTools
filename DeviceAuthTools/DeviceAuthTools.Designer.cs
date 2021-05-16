@@ -38,7 +38,6 @@
             this.ButtonGetExchange = new System.Windows.Forms.Button();
             this.LabelSetClient = new System.Windows.Forms.Label();
             this.LabelSetIOSClient = new System.Windows.Forms.Label();
-            this.LabelSetSwitchClient = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // RichTextBoxLogger
@@ -144,41 +143,23 @@
             this.LabelSetIOSClient.AutoSize = true;
             this.LabelSetIOSClient.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Underline, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.LabelSetIOSClient.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(238)))));
-            this.LabelSetIOSClient.Location = new System.Drawing.Point(479, 428);
+            this.LabelSetIOSClient.Location = new System.Drawing.Point(572, 428);
             this.LabelSetIOSClient.Name = "LabelSetIOSClient";
             this.LabelSetIOSClient.Size = new System.Drawing.Size(73, 13);
             this.LabelSetIOSClient.TabIndex = 8;
             this.LabelSetIOSClient.Text = "Set IOS Client";
             this.LabelSetIOSClient.Click += new System.EventHandler(this.LabelSetIOSClient_Click);
             this.LabelSetIOSClient.MouseDown += new System.Windows.Forms.MouseEventHandler(this.LabelSetIOSClient_MouseDown);
-            this.LabelSetIOSClient.MouseLeave += new System.EventHandler(this.LabelSetIOSClient_MouseLeave);
             this.LabelSetIOSClient.MouseHover += new System.EventHandler(this.LabelSetIOSClient_MouseHover);
+            this.LabelSetIOSClient.MouseLeave += new System.EventHandler(this.LabelSetIOSClient_MouseLeave);
             this.LabelSetIOSClient.MouseMove += new System.Windows.Forms.MouseEventHandler(this.LabelSetIOSClient_MouseMove);
             this.LabelSetIOSClient.MouseUp += new System.Windows.Forms.MouseEventHandler(this.LabelSetIOSClient_MouseUp);
-            // 
-            // LabelSetSwitchClient
-            // 
-            this.LabelSetSwitchClient.AutoSize = true;
-            this.LabelSetSwitchClient.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Underline, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.LabelSetSwitchClient.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(238)))));
-            this.LabelSetSwitchClient.Location = new System.Drawing.Point(558, 428);
-            this.LabelSetSwitchClient.Name = "LabelSetSwitchClient";
-            this.LabelSetSwitchClient.Size = new System.Drawing.Size(87, 13);
-            this.LabelSetSwitchClient.TabIndex = 9;
-            this.LabelSetSwitchClient.Text = "Set Switch Client";
-            this.LabelSetSwitchClient.Click += new System.EventHandler(this.LabelSetSwitchClient_Click);
-            this.LabelSetSwitchClient.MouseDown += new System.Windows.Forms.MouseEventHandler(this.LabelSetSwitchClient_MouseDown);
-            this.LabelSetSwitchClient.MouseLeave += new System.EventHandler(this.LabelSetSwitchClient_MouseLeave);
-            this.LabelSetSwitchClient.MouseHover += new System.EventHandler(this.LabelSetSwitchClient_MouseHover);
-            this.LabelSetSwitchClient.MouseMove += new System.Windows.Forms.MouseEventHandler(this.LabelSetSwitchClient_MouseMove);
-            this.LabelSetSwitchClient.MouseUp += new System.Windows.Forms.MouseEventHandler(this.LabelSetSwitchClient_MouseUp);
             // 
             // DeviceAuthTools
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Controls.Add(this.LabelSetSwitchClient);
             this.Controls.Add(this.LabelSetIOSClient);
             this.Controls.Add(this.LabelSetClient);
             this.Controls.Add(this.ButtonGetExchange);
@@ -207,7 +188,6 @@
         private System.Windows.Forms.Button ButtonGetExchange;
         private System.Windows.Forms.Label LabelSetClient;
         private System.Windows.Forms.Label LabelSetIOSClient;
-        private System.Windows.Forms.Label LabelSetSwitchClient;
     }
 }
 

@@ -4,368 +4,360 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace DeviceAuthGenerator
 {
     public partial class DeviceAuthTools : Form
     {
-        private static readonly HttpClient client = new HttpClient();
-        // Diesel - Dauntless client
-        private static readonly string deviceCodeClientId = "b070f20729f84693b5d621c904fc5bc2";
-        private static readonly string deviceCodeClientSecret = "HG@XE&TGCxEJsgT#&_p2]=aRo#~>=>+c6PhR)zXP";
-        // fortniteIOSClient
-        private static string clientId = "3446cd72694c4a4485d81b77adbb2141";
-        private static string clientSecret = "9209d4a5e25a457fb9b07489d313b41a";
-        private Timer checkDeviceCodeTimer;
-        private string deviceCode;
-        private string accountId;
+        public static readonly string ACCOUNT_API_BASE_URL = "https://account-public-service-prod03.ol.epicgames.com";
+        // Currently Diesel - Dauntless client
+        public static readonly string DEVICE_CODE_CLIENT_ID = "b070f20729f84693b5d621c904fc5bc2";
+        public static readonly string DEVICE_CODE_CLIENT_SECRET = "HG@XE&TGCxEJsgT#&_p2]=aRo#~>=>+c6PhR)zXP";
+        public readonly HttpClient httpClient = new HttpClient();
+        public Timer deviceCodeTimer;
+        // fortniteIOSClient by default
+        public string clientId = "3446cd72694c4a4485d81b77adbb2141";
+        public string clientSecret = "9209d4a5e25a457fb9b07489d313b41a";
+        public string deviceCode;
+        public string accessToken;
+        public string accountId;
 
         public DeviceAuthTools()
         {
             InitializeComponent();
 
-            this.RichTextBoxLogger.AppendText("Please login by pressing the Login button");
-
-            client.BaseAddress = new Uri("https://account-public-service-prod03.ol.epicgames.com");
-            client.DefaultRequestHeaders.Add("Authorization", GetDeviceCodeBasicToken());
+            WriteOutput("Please login by pressing the Login button");
         }
-        private string GetDeviceCodeBasicToken()
+
+        public void WriteOutput(string output)
         {
-            return _GetBasicToken(deviceCodeClientId, deviceCodeClientSecret);
+            WriteOutput(output, true);
         }
 
-        private string GetSwitchBasicToken()
+        public void WriteOutput(string output, bool clear)
         {
-            return _GetBasicToken("5229dcd3ac3845208b496649092f251b", "e3bd2d3e-bf8c-4857-9e7d-f3d947d220c7");
+            if (clear)
+            {
+                RichTextBoxLogger.Clear();
+            }
+
+            RichTextBoxLogger.AppendText(output);
         }
 
-        private string GetBasicToken()
+        public string GetDeviceCodeBasicToken()
         {
-            return _GetBasicToken(clientId, clientSecret);
+            return GetBasicToken(DEVICE_CODE_CLIENT_ID, DEVICE_CODE_CLIENT_SECRET);
         }
 
-        private string _GetBasicToken(string clientId, string clientSecret)
+        public string GetSwitchBasicToken()
+        {
+            return GetBasicToken("5229dcd3ac3845208b496649092f251b", "e3bd2d3e-bf8c-4857-9e7d-f3d947d220c7");
+        }
+
+        public string GetBasicToken()
+        {
+            return GetBasicToken(clientId, clientSecret);
+        }
+
+        public string GetBasicToken(string clientId, string clientSecret)
         {
             return "basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(clientId + ':' + clientSecret));
         }
 
-        async private void ButtonLogin_Click(object sender, EventArgs e)
+        public async Task<bool> HttpCheckForErrors(string url, HttpResponseMessage response)
         {
-            if (this.ButtonLogin.Text == "Logout")
+            if (!response.IsSuccessStatusCode)
             {
-                client.DefaultRequestHeaders.Remove("Authorization");
-                client.DefaultRequestHeaders.Add("Authorization", GetDeviceCodeBasicToken());
+                WriteOutput(url + " got " + (int)response.StatusCode + " status code\n\n" + JsonConvert.SerializeObject(await response.Content.ReadAsStringAsync(), Formatting.Indented));
+                return true;
+            }
+
+            return false;
+        }
+
+        public void SetAuthorizationHeader(string authorization)
+        {
+            RemoveAuthorizationHeader();
+            httpClient.DefaultRequestHeaders.Add("Authorization", authorization);
+        }
+
+        public void RemoveAuthorizationHeader()
+        {
+            httpClient.DefaultRequestHeaders.Remove("Authorization");
+        }
+
+        public async Task<dynamic> HttpGet(string url, string auth)
+        {
+            SetAuthorizationHeader(auth);
+            HttpResponseMessage response = await httpClient.GetAsync(ACCOUNT_API_BASE_URL + url);
+
+            RemoveAuthorizationHeader();
+            if (await HttpCheckForErrors(url, response))
+            {
+                return null;
+            }
+
+            return JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
+        }
+
+        public async Task<dynamic> HttpPost(string url, string auth, HttpContent body)
+        {
+            SetAuthorizationHeader(auth);
+            HttpResponseMessage response = await httpClient.PostAsync(ACCOUNT_API_BASE_URL + url, body);
+
+            RemoveAuthorizationHeader();
+            if (await HttpCheckForErrors(url, response))
+            {
+                return null;
+            }
+
+            return JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
+        }
+
+        public async Task<HttpResponseMessage> HttpPostRaw(string url, string auth, Dictionary<string, string> body, bool allowErrors)
+        {
+            SetAuthorizationHeader(auth);
+            HttpResponseMessage response = await httpClient.PostAsync(ACCOUNT_API_BASE_URL + url, new FormUrlEncodedContent(body));
+
+            RemoveAuthorizationHeader();
+            if (!allowErrors && await HttpCheckForErrors(url, response))
+            {
+                return null;
+            }
+
+            return response;
+        }
+
+        public async Task<dynamic> HttpDelete(string url, string auth)
+        {
+            SetAuthorizationHeader(auth);
+            HttpResponseMessage response = await httpClient.DeleteAsync(ACCOUNT_API_BASE_URL + url);
+
+            RemoveAuthorizationHeader();
+            if (await HttpCheckForErrors(url, response))
+            {
+                return null;
+            }
+
+
+            return JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
+        }
+
+        public async Task<HttpResponseMessage> HttpDeleteRaw(string url, string auth, bool allowErrors)
+        {
+            SetAuthorizationHeader(auth);
+            HttpResponseMessage response = await httpClient.DeleteAsync(ACCOUNT_API_BASE_URL + url);
+
+            RemoveAuthorizationHeader();
+            if (!allowErrors && await HttpCheckForErrors(url, response))
+            {
+                return null;
+            }
+
+
+            return response;
+        }
+
+        public bool IsLoggedIn()
+        {
+            return ButtonLogin.Text == "Logout";
+        }
+
+        public void SetLoggedIn(bool loggedIn)
+        {
+            if (!loggedIn)
+            {
+                deviceCodeTimer = null;
+                deviceCode = null;
                 accountId = null;
+            }
 
-                this.LabelSetClient.Visible = true;
-                this.LabelSetSwitchClient.Visible = true;
-                this.LabelSetIOSClient.Visible = true;
-                this.ButtonCreate.Enabled = false;
-                this.ButtonShow.Enabled = false;
-                this.ButtonDelete.Enabled = false;
-                this.ButtonGetExchange.Enabled = false;
-                this.ButtonLogin.Text = "Login";
-                this.RichTextBoxLogger.Clear();
-                this.RichTextBoxLogger.AppendText("Successfully logged out; login by pressing the Login button");
+            ButtonLogin.Enabled = true;
+            ButtonLogin.Text = loggedIn ? "Login" : "Logout";
+            ButtonCreate.Enabled = loggedIn;
+            ButtonShow.Enabled = loggedIn;
+            ButtonDelete.Enabled = loggedIn;
+            ButtonGetExchange.Enabled = loggedIn;
+            LabelSetIOSClient.Visible = !loggedIn;
+            LabelSetClient.Visible = !loggedIn;
+        }
+
+        public async void ButtonLogin_Click(object sender, EventArgs e)
+        {
+            if (IsLoggedIn())
+            {
+                SetLoggedIn(false);
+                WriteOutput("Successfully logged out");
                 return;
             }
 
-            this.RichTextBoxLogger.Clear();
-            this.ButtonLogin.Enabled = false;
-            this.RichTextBoxLogger.AppendText("Please wait...");
+            ButtonLogin.Enabled = false;
+            WriteOutput("Please wait...");
 
-            var body = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                { "grant_type", "client_credentials" }
-            });
+            dynamic response = await HttpPost("/account/api/oauth/token", GetDeviceCodeBasicToken(),
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    { "grant_type", "client_credentials" }
+                }));
+            if (response == null) return;
 
-            var response = await client.PostAsync("/account/api/oauth/token", body);
-            dynamic responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.Clear();
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to get an access token\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-                return;
-            }
+            response = await HttpPost("/account/api/oauth/deviceAuthorization", "bearer " + response.access_token, new FormUrlEncodedContent(new Dictionary<string, string> { }));
+            if (response == null) return;
 
-            client.DefaultRequestHeaders.Remove("Authorization");
-            client.DefaultRequestHeaders.Add("Authorization", "bearer " + responseData.access_token);
+            deviceCode = response.device_code;
 
-            body = new FormUrlEncodedContent(new Dictionary<string, string> { });
+            deviceCodeTimer = new Timer();
+            deviceCodeTimer.Tick += new EventHandler(delegate (Object o, EventArgs a) { CheckDeviceCode(); });
+            deviceCodeTimer.Interval = response.interval * 1000;
+            deviceCodeTimer.Start();
 
-            response = await client.PostAsync("/account/api/oauth/deviceAuthorization", body);
-            responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.Clear();
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to get an device code\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-                return;
-            }
-            deviceCode = responseData.device_code;
-
-            client.DefaultRequestHeaders.Remove("Authorization");
-            client.DefaultRequestHeaders.Add("Authorization", GetDeviceCodeBasicToken());
-
-            System.Diagnostics.Process.Start("" + responseData.verification_uri_complete);
-
-            checkDeviceCodeTimer = new Timer();
-            checkDeviceCodeTimer.Tick += new EventHandler(checkDeviceCodeTick);
-            checkDeviceCodeTimer.Interval = responseData.interval * 1000;
-            checkDeviceCodeTimer.Start();
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Waiting for device code completion...");
+            WriteOutput("Waiting for device code completion...");
+            System.Diagnostics.Process.Start(Convert.ToString(response.verification_uri_complete));
         }
 
-        async private void ButtonCreate_Click(object sender, EventArgs e)
+        public async void CheckDeviceCode()
         {
-            this.ButtonCreate.Enabled = false;
-            this.ButtonShow.Enabled = false;
-            this.ButtonDelete.Enabled = false;
-            this.ButtonGetExchange.Enabled = false;
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Please wait...");
-
-            var response = await client.PostAsync("/account/api/public/account/" + accountId + "/deviceAuth/", new StringContent("{}", Encoding.UTF8, "application/json"));
-            var responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-
-            this.RichTextBoxLogger.Clear();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to create a device auth\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-            }
-            else
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-
-            this.ButtonCreate.Enabled = true;
-            this.ButtonShow.Enabled = true;
-            this.ButtonDelete.Enabled = true;
-            this.ButtonGetExchange.Enabled = true;
-        }
-
-        async private void ButtonShow_Click(object sender, EventArgs e)
-        {
-            this.ButtonCreate.Enabled = false;
-            this.ButtonShow.Enabled = false;
-            this.ButtonDelete.Enabled = false;
-            this.ButtonGetExchange.Enabled = false;
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Please wait...");
-
-            var response = await client.GetAsync("/account/api/public/account/" + accountId + "/deviceAuth/");
-            var responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-
-            this.RichTextBoxLogger.Clear();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to get the device auths\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-            }
-            else
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-
-            this.ButtonCreate.Enabled = true;
-            this.ButtonShow.Enabled = true;
-            this.ButtonDelete.Enabled = true;
-            this.ButtonGetExchange.Enabled = true;
-        }
-
-        async private void ButtonDelete_Click(object sender, EventArgs e)
-        {
-            this.ButtonCreate.Enabled = false;
-            this.ButtonShow.Enabled = false;
-            this.ButtonDelete.Enabled = false;
-            this.ButtonGetExchange.Enabled = false;
-
-            string deviceAuthId = Prompt.ShowDialog("Enter the Device Id");
-            if(string.IsNullOrEmpty(deviceAuthId)) {
-                MessageBox.Show("The device id cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-                this.ButtonCreate.Enabled = true;
-                this.ButtonShow.Enabled = true;
-                this.ButtonDelete.Enabled = true;
-                this.ButtonGetExchange.Enabled = true;
-                return;
-            }
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Please wait...");
-
-            var response = await client.DeleteAsync("/account/api/public/account/" + accountId + "/deviceAuth/" + deviceAuthId);
-            var responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-
-            this.RichTextBoxLogger.Clear();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to delete the device " + deviceAuthId + " auth\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-            } else
-                this.RichTextBoxLogger.AppendText("Successfully deleted device " + deviceAuthId + " auth");
-
-            this.ButtonCreate.Enabled = true;
-            this.ButtonShow.Enabled = true;
-            this.ButtonDelete.Enabled = true;
-            this.ButtonGetExchange.Enabled = true;
-        }
-
-        async private void ButtonGetExchange_Click(object sender, EventArgs e)
-        {
-            this.ButtonCreate.Enabled = false;
-            this.ButtonShow.Enabled = false;
-            this.ButtonDelete.Enabled = false;
-            this.ButtonGetExchange.Enabled = false;
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Please wait...");
-
-            var response = await client.GetAsync("/account/api/oauth/exchange");
-            var responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-
-            this.RichTextBoxLogger.Clear();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to get an device auth\n\n");
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-            }
-            else
-                this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
-
-            this.ButtonCreate.Enabled = true;
-            this.ButtonShow.Enabled = true;
-            this.ButtonDelete.Enabled = true;
-            this.ButtonGetExchange.Enabled = true;
-        }
-
-        private void checkDeviceCodeTick(object sender, EventArgs e)
-        {
-            checkDeviceCode();
-        }
-
-        async private void checkDeviceCode()
-        {
-            client.DefaultRequestHeaders.Remove("Authorization");
-            client.DefaultRequestHeaders.Add("Authorization", GetSwitchBasicToken());
-
-            var body = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                { "grant_type", "device_code" },
-                { "device_code", deviceCode }
-            });
-
-            var response = await client.PostAsync("/account/api/oauth/token", body);
+            HttpResponseMessage response = await HttpPostRaw("/account/api/oauth/token", GetSwitchBasicToken(),
+                    new Dictionary<string, string>
+                    {
+                        { "grant_type", "device_code" },
+                        { "device_code", deviceCode }
+                    }, true);
             dynamic responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
             if (!response.IsSuccessStatusCode)
             {
                 if (responseData.errorCode == "errors.com.epicgames.not_found")
                 {
-                    this.ButtonLogin.Enabled = true;
-                    this.RichTextBoxLogger.Clear();
-                    this.RichTextBoxLogger.AppendText("The device code expired, please click again the Login button to login");
-                } else if(responseData.errorCode != "errors.com.epicgames.account.oauth.authorization_pending")
-                {
-                    this.ButtonLogin.Enabled = true;
-                    this.RichTextBoxLogger.Clear();
-                    this.RichTextBoxLogger.AppendText("Got " + (int)response.StatusCode + " status code while trying to get the access token by the device code\n\n");
-                    this.RichTextBoxLogger.AppendText(JsonConvert.SerializeObject(responseData, Formatting.Indented));
+                    deviceCodeTimer.Stop();
+                    SetLoggedIn(false);
+                    WriteOutput("The device code expired, press the Login button again to login");
                 }
+                else if (responseData.errorCode != "errors.com.epicgames.account.oauth.authorization_pending")
+                {
+                    deviceCodeTimer.Stop();
+                    SetLoggedIn(false);
+                    WriteOutput(ACCOUNT_API_BASE_URL + "/account/api/oauth/token got " + (int)response.StatusCode + " status code\n\n" + JsonConvert.SerializeObject(responseData, Formatting.Indented));
+                }
+
                 return;
             }
 
-            checkDeviceCodeTimer.Stop();
-
-            client.DefaultRequestHeaders.Remove("Authorization");
-            client.DefaultRequestHeaders.Add("Authorization", "bearer " + responseData.access_token);
+            deviceCodeTimer.Stop();
 
             if (GetSwitchBasicToken() != GetBasicToken())
             {
-                response = await client.GetAsync("/account/api/oauth/exchange");
-                responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-                string exchangeCode = responseData.code;
-
-                body = new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    { "grant_type", "exchange_code" },
-                    { "exchange_code", exchangeCode }
-                });
-
-                client.DefaultRequestHeaders.Remove("Authorization");
-                client.DefaultRequestHeaders.Add("Authorization", GetBasicToken());
-
-                response = await client.PostAsync("/account/api/oauth/token", body);
-                responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
-
-                client.DefaultRequestHeaders.Remove("Authorization");
-                client.DefaultRequestHeaders.Add("Authorization", "bearer " + responseData.access_token);
+                responseData = await HttpGet("/account/api/oauth/exchange", "bearer " + responseData.access_token);
+                if (responseData == null) return;
+                responseData = await HttpPost("/account/api/oauth/token", GetBasicToken(),
+                    new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        { "grant_type", "exchange_code" },
+                        { "exchange_code", Convert.ToString(responseData.code) }
+                    }));
+                if (responseData == null) return;
             }
 
+            accessToken = "bearer " + responseData.access_token;
             accountId = responseData.account_id;
 
-            this.LabelSetClient.Visible = false;
-            this.LabelSetSwitchClient.Visible = false;
-            this.LabelSetIOSClient.Visible = false;
-            this.ButtonCreate.Enabled = true;
-            this.ButtonShow.Enabled = true;
-            this.ButtonDelete.Enabled = true;
-            this.ButtonGetExchange.Enabled = true;
-            this.ButtonLogin.Text = "Logout";
-            this.ButtonLogin.Enabled = true;
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Welcome, " + responseData.displayName);
+            SetLoggedIn(true);
+            WriteOutput("Welcome, " + responseData.displayName);
         }
 
-        private void LabelSetUserAgent_Click(object sender, EventArgs e)
+        public void LockButtons(bool locked)
         {
-            string userAgent = Prompt.ShowDialog("Enter the User Agent");
-            if (string.IsNullOrEmpty(userAgent))
+            ButtonLogin.Enabled = !locked;
+            ButtonCreate.Enabled = !locked;
+            ButtonShow.Enabled = !locked;
+            ButtonDelete.Enabled = !locked;
+            ButtonGetExchange.Enabled = !locked;
+        }
+
+        public async void ButtonCreate_Click(object sender, EventArgs e)
+        {
+            LockButtons(true);
+            WriteOutput("Please wait...");
+
+            dynamic response = await HttpPost("/account/api/public/account/" + accountId + "/deviceAuth/", accessToken, new StringContent("{}", Encoding.UTF8, "application/json"));
+            if (response == null)
             {
-                MessageBox.Show("The User-Agent cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LockButtons(false);
                 return;
             }
 
-            client.DefaultRequestHeaders.Remove("User-Agent");
-            client.DefaultRequestHeaders.Add("User-Agent", "" + userAgent);
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Successfully set the User-Agent to " + userAgent);
+            WriteOutput(JsonConvert.SerializeObject(response, Formatting.Indented));
+            LockButtons(false);
         }
 
-        private void LabelSetUserAgent_MouseDown(object sender, MouseEventArgs e)
+        public async void ButtonShow_Click(object sender, EventArgs e)
         {
-            this.LabelSetUserAgent.ForeColor = Color.FromArgb(255, 0, 0);
+            LockButtons(true);
+            WriteOutput("Please wait...");
+
+            dynamic response = await HttpGet("/account/api/public/account/" + accountId + "/deviceAuth/", accessToken);
+            if (response == null)
+            {
+                LockButtons(false);
+                return;
+            }
+
+            WriteOutput(JsonConvert.SerializeObject(response, Formatting.Indented));
+            LockButtons(false);
         }
 
-        private void LabelSetUserAgent_MouseUp(object sender, MouseEventArgs e)
+        public async void ButtonDelete_Click(object sender, EventArgs e)
         {
-            this.LabelSetUserAgent.ForeColor = Color.FromArgb(0, 0, 238);
+            LockButtons(true);
+
+            string deviceAuthId = Prompt.ShowDialog("Enter the Device Auth ID");
+            if (string.IsNullOrEmpty(deviceAuthId))
+            {
+                MessageBox.Show("The Device Auth ID cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LockButtons(false);
+                return;
+            }
+
+            WriteOutput("Please wait...");
+
+            HttpResponseMessage response = await HttpDeleteRaw("/account/api/public/account/" + accountId + "/deviceAuth/" + deviceAuthId, accessToken, true);
+            if (!response.IsSuccessStatusCode)
+            {
+                WriteOutput(ACCOUNT_API_BASE_URL + "/account/api/public/account/" + accountId + "/deviceAuth/" + deviceAuthId + " got " + (int)response.StatusCode + " status code\n\n" + JsonConvert.SerializeObject(await response.Content.ReadAsStringAsync(), Formatting.Indented));
+                LockButtons(false);
+                return;
+            }
+
+            WriteOutput("Successfully deleted the device auth with id " + deviceAuthId);
+            LockButtons(false);
         }
 
-        private void LabelSetUserAgent_MouseHover(object sender, EventArgs e)
+        public async void ButtonGetExchange_Click(object sender, EventArgs e)
         {
-            this.LabelSetUserAgent.ForeColor = Color.FromArgb(0, 119, 204);
-            Cursor.Current = Cursors.Hand;
+            LockButtons(true);
+            WriteOutput("Please wait...");
+
+            dynamic response = await HttpGet("/account/api/oauth/exchange", accessToken);
+            if (response == null)
+            {
+                LockButtons(false);
+                return;
+            }
+
+            WriteOutput(JsonConvert.SerializeObject(response, Formatting.Indented));
+            LockButtons(false);
         }
 
-        private void LabelSetUserAgent_MouseLeave(object sender, EventArgs e)
+        public async void LabelSetIOSClient_Click(object sender, EventArgs e)
         {
-            this.LabelSetUserAgent.ForeColor = Color.FromArgb(0, 0, 238);
-            Cursor.Current = Cursors.Default;
+            clientId = "3446cd72694c4a4485d81b77adbb2141";
+            clientSecret = "9209d4a5e25a457fb9b07489d313b41a";
+
+            WriteOutput("Successfully set the client to IOS (" + clientId + ':' + clientSecret + ')');
         }
 
-        private void LabelSetUserAgent_MouseMove(object sender, MouseEventArgs e)
-        {
-            Cursor.Current = Cursors.Hand;
-        }
-        private void LabelSetClient_Click(object sender, EventArgs e)
+        public async void LabelSetClient_Click(object sender, EventArgs e)
         {
             string clientId = Prompt.ShowDialog("Enter the Client ID");
             if (string.IsNullOrEmpty(clientId))
@@ -381,108 +373,115 @@ namespace DeviceAuthGenerator
                 return;
             }
 
-            DeviceAuthTools.clientId = clientId;
-            DeviceAuthTools.clientSecret = clientSecret;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
 
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Successfully set the client to " + GetBasicToken() + " (" + clientId + ':' + clientSecret + " base64 encoded)");
+            WriteOutput("Successfully set the client (" + clientId + ':' + clientSecret + ')');
         }
 
-        private void LabelSetClient_MouseDown(object sender, MouseEventArgs e)
+        public async void LabelSetUserAgent_Click(object sender, EventArgs e)
         {
-            this.LabelSetClient.ForeColor = Color.FromArgb(255, 0, 0);
+            string userAgent = Prompt.ShowDialog("Enter the User Agent");
+            if (string.IsNullOrEmpty(userAgent))
+            {
+                httpClient.DefaultRequestHeaders.Remove("User-Agent");
+                WriteOutput("Successfully removed the User-Agent");
+            } else
+            {
+                httpClient.DefaultRequestHeaders.Remove("User-Agent");
+                httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent);
+                WriteOutput("Successfully set the User-Agent to " + userAgent);
+            }
         }
 
-        private void LabelSetClient_MouseUp(object sender, MouseEventArgs e)
+
+
+        // GARBAGE
+        public async void LabelSetIOSClient_MouseDown(object sender, EventArgs e)
         {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
+            LabelSetIOSClient.ForeColor = Color.FromArgb(255, 0, 0);
         }
 
-        private void LabelSetClient_MouseHover(object sender, EventArgs e)
+        public async void LabelSetClient_MouseDown(object sender, EventArgs e)
         {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 119, 204);
+            LabelSetClient.ForeColor = Color.FromArgb(255, 0, 0);
+        }
+
+        public async void LabelSetUserAgent_MouseDown(object sender, EventArgs e)
+        {
+            LabelSetUserAgent.ForeColor = Color.FromArgb(255, 0, 0);
+        }
+
+
+
+        public async void LabelSetIOSClient_MouseLeave(object sender, EventArgs e)
+        {
+            LabelSetIOSClient.ForeColor = Color.FromArgb(0, 0, 238);
+        }
+
+        public async void LabelSetClient_MouseLeave(object sender, EventArgs e)
+        {
+            LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
+        }
+
+        public async void LabelSetUserAgent_MouseLeave(object sender, EventArgs e)
+        {
+            LabelSetUserAgent.ForeColor = Color.FromArgb(0, 0, 238);
+        }
+
+
+
+        public async void LabelSetIOSClient_MouseHover(object sender, EventArgs e)
+        {
+            LabelSetIOSClient.ForeColor = Color.FromArgb(0, 119, 204);
             Cursor.Current = Cursors.Hand;
         }
 
-        private void LabelSetClient_MouseLeave(object sender, EventArgs e)
+        public async void LabelSetClient_MouseHover(object sender, EventArgs e)
         {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
+            LabelSetClient.ForeColor = Color.FromArgb(0, 119, 204);
+            Cursor.Current = Cursors.Hand;
+        }
+
+        public async void LabelSetUserAgent_MouseHover(object sender, EventArgs e)
+        {
+            LabelSetUserAgent.ForeColor = Color.FromArgb(0, 119, 204);
+            Cursor.Current = Cursors.Hand;
+        }
+
+
+
+        public async void LabelSetIOSClient_MouseMove(object sender, EventArgs e)
+        {
+            LabelSetIOSClient.ForeColor = Color.FromArgb(0, 0, 238);
             Cursor.Current = Cursors.Default;
         }
 
-        private void LabelSetClient_MouseMove(object sender, MouseEventArgs e)
+        public async void LabelSetClient_MouseMove(object sender, EventArgs e)
         {
-            Cursor.Current = Cursors.Hand;
-        }
-
-        private void LabelSetIOSClient_Click(object sender, EventArgs e)
-        {
-            clientId = "3446cd72694c4a4485d81b77adbb2141";
-            clientSecret = "9209d4a5e25a457fb9b07489d313b41a";
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Successfully set the client to IOS (" + GetBasicToken() + "; " + clientId + ':' + clientSecret + " base64 encoded)");
-        }
-
-        private void LabelSetIOSClient_MouseDown(object sender, MouseEventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(255, 0, 0);
-        }
-
-        private void LabelSetIOSClient_MouseUp(object sender, MouseEventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
-        }
-
-        private void LabelSetIOSClient_MouseHover(object sender, EventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 119, 204);
-            Cursor.Current = Cursors.Hand;
-        }
-
-        private void LabelSetIOSClient_MouseLeave(object sender, EventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
+            LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
             Cursor.Current = Cursors.Default;
         }
 
-        private void LabelSetIOSClient_MouseMove(object sender, MouseEventArgs e)
+        public async void LabelSetUserAgent_MouseMove(object sender, EventArgs e)
         {
-            Cursor.Current = Cursors.Hand;
-        }
-
-        private void LabelSetSwitchClient_Click(object sender, EventArgs e)
-        {
-            clientId = "5229dcd3ac3845208b496649092f251b";
-            clientSecret = "e3bd2d3e-bf8c-4857-9e7d-f3d947d220c7";
-
-            this.RichTextBoxLogger.Clear();
-            this.RichTextBoxLogger.AppendText("Successfully set the client to Switch (" + GetBasicToken() + "; " + clientId + ':' + clientSecret + " base64 encoded)");
-        }
-
-        private void LabelSetSwitchClient_MouseDown(object sender, MouseEventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(255, 0, 0);
-        }
-
-        private void LabelSetSwitchClient_MouseUp(object sender, MouseEventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
-        }
-
-        private void LabelSetSwitchClient_MouseHover(object sender, EventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 119, 204);
-            Cursor.Current = Cursors.Hand;
-        }
-
-        private void LabelSetSwitchClient_MouseLeave(object sender, EventArgs e)
-        {
-            this.LabelSetClient.ForeColor = Color.FromArgb(0, 0, 238);
+            LabelSetUserAgent.ForeColor = Color.FromArgb(0, 0, 238);
             Cursor.Current = Cursors.Default;
         }
 
-        private void LabelSetSwitchClient_MouseMove(object sender, MouseEventArgs e)
+
+
+        public async void LabelSetIOSClient_MouseUp(object sender, EventArgs e)
+        {
+            Cursor.Current = Cursors.Hand;
+        }
+
+        public async void LabelSetClient_MouseUp(object sender, EventArgs e)
+        {
+            Cursor.Current = Cursors.Hand;
+        }
+
+        public async void LabelSetUserAgent_MouseUp(object sender, EventArgs e)
         {
             Cursor.Current = Cursors.Hand;
         }
