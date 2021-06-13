@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using System.Windows.Forms;
 
 namespace DeviceAuthGenerator
@@ -12,23 +13,33 @@ namespace DeviceAuthGenerator
     public partial class DeviceAuthTools : Form
     {
         public static readonly string ACCOUNT_API_BASE_URL = "https://account-public-service-prod03.ol.epicgames.com";
-        // Currently Diesel - Dauntless client
-        public static readonly string DEVICE_CODE_CLIENT_ID = "b070f20729f84693b5d621c904fc5bc2";
-        public static readonly string DEVICE_CODE_CLIENT_SECRET = "HG@XE&TGCxEJsgT#&_p2]=aRo#~>=>+c6PhR)zXP";
+        // Device code shit; Currently Diesel - Dauntless client
+        // public static readonly string DEVICE_CODE_CLIENT_ID = "b070f20729f84693b5d621c904fc5bc2";
+        // public static readonly string DEVICE_CODE_CLIENT_SECRET = "HG@XE&TGCxEJsgT#&_p2]=aRo#~>=>+c6PhR)zXP";
         public readonly HttpClient httpClient = new HttpClient();
-        public Timer deviceCodeTimer;
+        // IOS User-Agent by default
+        public string userAgent = "FortniteGame/++Fortnite+Release-13.40-CL-14050091 IOS/13.6";
         // fortniteIOSClient by default
         public string clientId = "3446cd72694c4a4485d81b77adbb2141";
         public string clientSecret = "9209d4a5e25a457fb9b07489d313b41a";
         public string deviceCode;
         public string accessToken;
         public string accountId;
+        // Device code shit
+        // public Timer deviceCodeTimer;
 
         public DeviceAuthTools()
         {
             InitializeComponent();
+            SetUserAgent();
 
             WriteOutput("Please login by pressing the Login button");
+        }
+
+        public void SetUserAgent()
+        {
+            httpClient.DefaultRequestHeaders.Remove("User-Agent");
+            httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent);
         }
 
         public void WriteOutput(string output)
@@ -46,10 +57,11 @@ namespace DeviceAuthGenerator
             RichTextBoxLogger.AppendText(output);
         }
 
-        public string GetDeviceCodeBasicToken()
+        // Device code shit
+        /* public string GetDeviceCodeBasicToken()
         {
             return GetBasicToken(DEVICE_CODE_CLIENT_ID, DEVICE_CODE_CLIENT_SECRET);
-        }
+        } */
 
         public string GetSwitchBasicToken()
         {
@@ -169,19 +181,33 @@ namespace DeviceAuthGenerator
         {
             if (!loggedIn)
             {
-                deviceCodeTimer = null;
                 deviceCode = null;
                 accountId = null;
             }
 
             ButtonLogin.Enabled = true;
-            ButtonLogin.Text = loggedIn ? "Login" : "Logout";
+            ButtonLogin.Text = loggedIn ? "Logout" : "Login";
             ButtonCreate.Enabled = loggedIn;
             ButtonShow.Enabled = loggedIn;
             ButtonDelete.Enabled = loggedIn;
             ButtonGetExchange.Enabled = loggedIn;
             LabelSetIOSClient.Visible = !loggedIn;
             LabelSetClient.Visible = !loggedIn;
+        }
+
+        public string GetAuthorizationCode(string redirectUrl)
+        {
+            Uri redirectUri;
+            try
+            {
+                redirectUri = new Uri(redirectUrl);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            return HttpUtility.ParseQueryString(redirectUri.Query).Get("code");
         }
 
         public async void ButtonLogin_Click(object sender, EventArgs e)
@@ -194,9 +220,59 @@ namespace DeviceAuthGenerator
             }
 
             ButtonLogin.Enabled = false;
+
+            string authorizationCodeRaw = Prompt.Authorization("Enter an authorization code", clientId);
+            if (authorizationCodeRaw == "\x00")
+            {
+                ButtonLogin.Enabled = true;
+                return;
+            }
+
+            if (string.IsNullOrEmpty(authorizationCodeRaw))
+            {
+                MessageBox.Show("The authorization code cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ButtonLogin.Enabled = true;
+                return;
+            }
+
             WriteOutput("Please wait...");
 
-            dynamic response = await HttpPost("/account/api/oauth/token", GetDeviceCodeBasicToken(),
+            string authorizationCode;
+            try
+            {
+                dynamic authorizationCodeData = JsonConvert.DeserializeObject(authorizationCodeRaw);
+                authorizationCode = GetAuthorizationCode((string)authorizationCodeData.redirectUrl);
+            }
+            catch (Exception)
+            {
+                authorizationCode = GetAuthorizationCode(authorizationCodeRaw);
+            }
+
+            if (string.IsNullOrEmpty(authorizationCode))
+                authorizationCode = authorizationCodeRaw;
+
+            HttpResponseMessage response = await HttpPostRaw("/account/api/oauth/token", GetBasicToken(),
+                    new Dictionary<string, string>
+                    {
+                        { "grant_type", "authorization_code" },
+                        { "code", authorizationCode }
+                    }, true);
+            dynamic responseData = JsonConvert.DeserializeObject(await response.Content.ReadAsStringAsync());
+            if (!response.IsSuccessStatusCode)
+            {
+                WriteOutput(ACCOUNT_API_BASE_URL + "/account/api/oauth/token got " + (int)response.StatusCode + " status code\n\n" + JsonConvert.SerializeObject(responseData, Formatting.Indented));
+                ButtonLogin.Enabled = true; 
+                return;
+            }
+
+            accessToken = "bearer " + responseData.access_token;
+            accountId = responseData.account_id;
+
+            SetLoggedIn(true);
+            WriteOutput("Welcome, " + responseData.displayName);
+
+            // Device code shit
+            /* dynamic response = await HttpPost("/account/api/oauth/token", GetDeviceCodeBasicToken(),
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     { "grant_type", "client_credentials" }
@@ -214,10 +290,11 @@ namespace DeviceAuthGenerator
             deviceCodeTimer.Start();
 
             WriteOutput("Waiting for device code completion...");
-            System.Diagnostics.Process.Start(Convert.ToString(response.verification_uri_complete));
+            System.Diagnostics.Process.Start(Convert.ToString(response.verification_uri_complete)); */
         }
 
-        public async void CheckDeviceCode()
+        // Device code shit
+        /* public async void CheckDeviceCode()
         {
             HttpResponseMessage response = await HttpPostRaw("/account/api/oauth/token", GetSwitchBasicToken(),
                     new Dictionary<string, string>
@@ -264,7 +341,7 @@ namespace DeviceAuthGenerator
 
             SetLoggedIn(true);
             WriteOutput("Welcome, " + responseData.displayName);
-        }
+        } */
 
         public void LockButtons(bool locked)
         {
@@ -312,6 +389,12 @@ namespace DeviceAuthGenerator
             LockButtons(true);
 
             string deviceAuthId = Prompt.ShowDialog("Enter the Device Auth ID");
+            if (deviceAuthId == "\x00")
+            {
+                LockButtons(false);
+                return;
+            }
+
             if (string.IsNullOrEmpty(deviceAuthId))
             {
                 MessageBox.Show("The Device Auth ID cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -359,14 +442,20 @@ namespace DeviceAuthGenerator
 
         public async void LabelSetClient_Click(object sender, EventArgs e)
         {
-            string clientId = Prompt.ShowDialog("Enter the Client ID");
+            string clientId = Prompt.ShowDialog("Enter the Client ID", this.clientId);
+            if (clientId == "\x00")
+                return;
+
             if (string.IsNullOrEmpty(clientId))
             {
                 MessageBox.Show("The Client ID cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            string clientSecret = Prompt.ShowDialog("Enter the Client secret");
+            string clientSecret = Prompt.ShowDialog("Enter the Client secret", this.clientSecret);
+            if (clientSecret == "\x00")
+                return;
+
             if (string.IsNullOrEmpty(clientSecret))
             {
                 MessageBox.Show("The Client secret cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -381,15 +470,21 @@ namespace DeviceAuthGenerator
 
         public async void LabelSetUserAgent_Click(object sender, EventArgs e)
         {
-            string userAgent = Prompt.ShowDialog("Enter the User Agent");
+            string userAgent = Prompt.ShowDialog("Enter the User Agent", this.userAgent);
+            if (userAgent == "\x00")
+                return;
+
             if (string.IsNullOrEmpty(userAgent))
             {
+                this.userAgent = "";
                 httpClient.DefaultRequestHeaders.Remove("User-Agent");
+
                 WriteOutput("Successfully removed the User-Agent");
             } else
             {
-                httpClient.DefaultRequestHeaders.Remove("User-Agent");
-                httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent);
+                this.userAgent = userAgent;
+                SetUserAgent();
+
                 WriteOutput("Successfully set the User-Agent to " + userAgent);
             }
         }
